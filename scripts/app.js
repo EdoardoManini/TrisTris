@@ -73,6 +73,171 @@ renderStatus(state);
 renderBoard(state);
 
 // ==========================================
+// TIMER MANAGEMENT
+// ==========================================
+
+function startTimer(state) {
+  if (!state.timedMode) {
+    return;
+  }
+
+  // Ferma timer precedente
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+  }
+
+  // Inizializza timestamp di tick (non di mossa)
+  state.lastTickTime = Date.now();
+
+  state.timerInterval = setInterval(() => {
+    if (state.ui.screen !== "game" || state.ui.viewingMicro !== null) {
+      return;
+    }
+
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - state.lastTickTime) / 1000);
+    
+    if (elapsedSeconds <= 0) return; // ancora non è passato un secondo intero
+    
+    let needsUpdate = false;
+
+    if (state.turn === 0) {
+      // Turno di X → decrementa timerX di elapsedSeconds
+      const newTimerX = Math.max(0, state.timerX - elapsedSeconds);
+      if (newTimerX !== state.timerX) {
+        state.timerX = newTimerX;
+        needsUpdate = true;
+        
+        if (state.timerX === 0) {
+          stopTimer(state);
+          handleTimeoutWin("O");
+          return;
+        }
+      }
+    } else {
+      // Turno di O → decrementa timerO di elapsedSeconds
+      const newTimerO = Math.max(0, state.timerO - elapsedSeconds);
+      if (newTimerO !== state.timerO) {
+        state.timerO = newTimerO;
+        needsUpdate = true;
+        
+        if (state.timerO === 0) {
+          stopTimer(state);
+          handleTimeoutWin("X");
+          return;
+        }
+      }
+    }
+    // Avanza il riferimento del tick solo della parte consumata
+    state.lastTickTime += elapsedSeconds * 1000;
+
+    // Aggiorna solo i timer, non tutta la board
+    if (needsUpdate) {
+      updateTimerDisplay(state);
+    }
+  }, 1000); // Aggiorna ogni secondo, non ogni 100ms
+}
+
+function updateTimerDisplay(state) {
+  const timerTopEl = document.querySelector('.timer-top');
+  const timerBottomEl = document.querySelector('.timer-bottom');
+  
+  if (timerTopEl) {
+    const timeEl = timerTopEl.querySelector('.timer-time');
+    if (timeEl) {
+      timeEl.textContent = formatTime(state.timerO);
+    }
+    
+    // Aggiorna classi warning/danger
+    timerTopEl.classList.remove('warning', 'danger', 'active');
+    if (state.turn === 1) timerTopEl.classList.add('active');
+    if (state.timerO <= 60 && state.timerO > 10) {
+      timerTopEl.classList.add('warning');
+    } else if (state.timerO <= 10) {
+      timerTopEl.classList.add('danger');
+    }
+  }
+  
+  if (timerBottomEl) {
+    const timeEl = timerBottomEl.querySelector('.timer-time');
+    if (timeEl) {
+      timeEl.textContent = formatTime(state.timerX);
+    }
+    
+    // Aggiorna classi warning/danger
+    timerBottomEl.classList.remove('warning', 'danger', 'active');
+    if (state.turn === 0) timerBottomEl.classList.add('active');
+    if (state.timerX <= 60 && state.timerX > 10) {
+      timerBottomEl.classList.add('warning');
+    } else if (state.timerX <= 10) {
+      timerBottomEl.classList.add('danger');
+    }
+  }
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function stopTimer(state) {
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+}
+
+function switchTimer(state) {
+  if (!state.timedMode) {
+    return;
+  }
+
+  const now = Date.now();
+  const elapsedSeconds = Math.floor((now - (state.lastTickTime || now)) / 1000);
+
+  if (elapsedSeconds > 0) {
+      if (state.turn === 1) {
+        // Se adesso tocca a O, ha appena mosso X → consuma su X
+        state.timerX = Math.max(0, state.timerX - elapsedSeconds);
+        if (state.timerX === 0) {
+          stopTimer(state);
+          handleTimeoutWin("O");
+          return;
+        }
+      } else {
+        // Se adesso tocca a X, ha appena mosso O → consuma su O
+        state.timerO = Math.max(0, state.timerO - elapsedSeconds);
+        if (state.timerO === 0) {
+          stopTimer(state);
+          handleTimeoutWin("X");
+          return;
+        }
+      }
+    }
+
+  // Reset del timestamp per il nuovo turno
+  state.lastMoveTime = Date.now();
+  
+  // Aggiorna la UI dei timer subito
+  updateTimerDisplay(state);
+}
+
+function handleTimeoutWin(winner) {
+  setTimeout(() => {
+    alert(`Tempo scaduto! ${winner} vince per timeout!`);
+    
+    if (state.onlineChannel) {
+      unsubscribe(state.onlineChannel);
+    }
+    
+    state.ui.screen = "menu";
+    renderStatus(state);
+    renderBoard(state);
+  }, 100);
+}
+
+// ==========================================
 // CLICK HANDLER
 // ==========================================
 
@@ -98,7 +263,32 @@ document.addEventListener("click", async (e) => {
 
   /* ---- BOTTONE PVP ---- */
   if (el.dataset.action === "start-pvp") {
-    resetGame(state, "pvp");
+    state.ui.screen = "pvp-mode";
+    renderStatus(state);
+    renderBoard(state);
+    return;
+  }
+
+  /* ---- PVP TIMED ---- */
+  if (el.dataset.action === "pvp-timed") {
+    resetGame(state, "pvp", null, true);
+    startTimer(state);
+    renderStatus(state);
+    renderBoard(state);
+    return;
+  }
+
+  /* ---- PVP CLASSIC ---- */
+  if (el.dataset.action === "pvp-classic") {
+    resetGame(state, "pvp", null, false);
+    renderStatus(state);
+    renderBoard(state);
+    return;
+  }
+
+  /* ---- ANNULLA PVP MODE ---- */
+  if (el.dataset.action === "cancel-pvp-mode") {
+    state.ui.screen = "menu";
     renderStatus(state);
     renderBoard(state);
     return;
@@ -183,20 +373,61 @@ document.addEventListener("click", async (e) => {
 
   /* ---- CREA PARTITA ONLINE ---- */
   if (el.dataset.action === "create-online") {
+    state.ui.screen = "online-mode";
+    renderStatus(state);
+    renderBoard(state);
+    return;
+  }
+
+  /* ---- ONLINE TIMED ---- */
+  if (el.dataset.action === "online-timed") {
     const result = await createGame();
     if (result.success) {
       state.onlineGameId = result.gameId;
       state.onlineGameCode = result.code;
       state.onlinePlayerId = result.playerId;
       state.onlinePlayer1Id = result.playerId;
+      state.onlinePlayer1Nickname = state.user?.nickname || "Player1";
       state.onlineWaiting = true;
+      state.timedMode = true;
+      state.ui.screen = "online";
       renderStatus(state);
       renderBoard(state);
       
-      waitForOpponent(result.gameId);
+      waitForOpponent(result.gameId, true);
     } else {
       alert(`Errore: ${result.error}`);
     }
+    return;
+  }
+
+  /* ---- ONLINE CLASSIC ---- */
+  if (el.dataset.action === "online-classic") {
+    const result = await createGame();
+    if (result.success) {
+      state.onlineGameId = result.gameId;
+      state.onlineGameCode = result.code;
+      state.onlinePlayerId = result.playerId;
+      state.onlinePlayer1Id = result.playerId;
+      state.onlinePlayer1Nickname = state.user?.nickname || "Player1";
+      state.onlineWaiting = true;
+      state.timedMode = false;
+      state.ui.screen = "online";
+      renderStatus(state);
+      renderBoard(state);
+      
+      waitForOpponent(result.gameId, false);
+    } else {
+      alert(`Errore: ${result.error}`);
+    }
+    return;
+  }
+
+  /* ---- ANNULLA ONLINE MODE ---- */
+  if (el.dataset.action === "cancel-online-mode") {
+    state.ui.screen = "online";
+    renderStatus(state);
+    renderBoard(state);
     return;
   }
 
@@ -210,20 +441,40 @@ document.addEventListener("click", async (e) => {
       return;
     }
     
+    // Prima carica lo stato del gioco per verificare il creatore
+    const gameStateCheck = await loadGameState(code);
+    
+    if (!gameStateCheck || !gameStateCheck.player1_id) {
+      alert("Partita non trovata");
+      return;
+    }
+    
+    // Verifica che non stia giocando contro se stesso
+    if (state.user && gameStateCheck.player1_id === state.user.id) {
+      alert("Non puoi giocare contro te stesso!");
+      return;
+    }
+    
     const result = await joinGame(code);
     if (result.success) {
-      resetGame(state, "online");
+      // Carica lo stato del gioco per ottenere la modalità timer
+      const gameState = await loadGameState(result.gameId);
+      const timed = gameState?.state?.timedMode || false;
+      
+      resetGame(state, "online", null, timed);
       state.onlineGameId = result.gameId;
       state.onlineGameCode = result.code;
       state.onlinePlayerId = result.playerId;
       state.onlinePlayer1Id = result.player1Id;
       
-      const gameState = await loadGameState(result.gameId);
       if (gameState && gameState.state) {
         Object.assign(state, gameState.state);
         state.onlinePlayer1Id = gameState.player1Id;
       }
       
+      if (timed) {
+        startTimer(state);
+      }
       renderStatus(state);
       renderBoard(state);
       
@@ -239,7 +490,10 @@ document.addEventListener("click", async (e) => {
     if (state.onlineChannel) {
       await unsubscribe(state.onlineChannel);
       state.onlineChannel = null;
+      state.onlineChannel = null;
     }
+    state.ui.screen = "menu";
+    stopTimer(state);
     state.ui.screen = "menu";
     state.onlineWaiting = false;
     state.onlineGameCode = null;
@@ -273,6 +527,36 @@ document.addEventListener("click", async (e) => {
       if (state.onlineChannel) {
         await unsubscribe(state.onlineChannel);
       }
+      stopTimer(state);
+      state.ui.screen = "menu";
+      renderStatus(state);
+      renderBoard(state);
+    }
+    return;
+  }
+
+  /* ---- RESA ---- */
+  if (el.dataset.action === "surrender") {
+    const confirm = window.confirm("Sei sicuro di volerti arrendere? Perderai la partita.");
+    if (confirm) {
+      const winner = state.turn === 0 ? "O" : "X";
+      
+      if (state.gameMode === "online") {
+        await finishGame(state.onlineGameId, winner);
+        
+        if (state.user) {
+          const opponentElo = 1000;
+          await updateUserStats(state.user.id, "loss", opponentElo);
+        }
+      }
+      
+      stopTimer(state);
+      alert(`Ti sei arreso. ${winner} vince!`);
+      
+      if (state.onlineChannel) {
+        await unsubscribe(state.onlineChannel);
+      }
+      
       state.ui.screen = "menu";
       renderStatus(state);
       renderBoard(state);
@@ -283,11 +567,20 @@ document.addEventListener("click", async (e) => {
   /* ---- CHIUDI FULLSCREEN ---- */
   if (el.dataset.action === "close-micro") {
     const microIndex = state.ui.viewingMicro;
-    animateMicroZoomOut(microIndex, () => {
+    
+    // Se timedMode è true, chiudi immediatamente senza animazione
+    if (state.timedMode) {
       state.ui.viewingMicro = null;
       renderStatus(state);
       renderBoard(state);
-    });
+    } else {
+      // Altrimenti usa l'animazione zoom out
+      animateMicroZoomOut(microIndex, () => {
+        state.ui.viewingMicro = null;
+        renderStatus(state);
+        renderBoard(state);
+      });
+    }
     return;
   }
 
@@ -304,7 +597,15 @@ document.addEventListener("click", async (e) => {
       if (!isMyTurn) return;
     }
   
-    animateMicroZoomIn(cell, idx);
+    // Se timedMode è true, mostra immediatamente senza animazione
+    if (state.timedMode) {
+      state.ui.viewingMicro = idx;
+      renderStatus(state);
+      renderBoard(state);
+    } else {
+      // Altrimenti usa l'animazione zoom
+      animateMicroZoomIn(cell, idx);
+    }
     return;
   }
 
@@ -333,6 +634,8 @@ async function handleMove(micro, row, col) {
   const result = playMove(state, micro, row, col);
 
   if (result.moved) {
+    switchTimer(state);
+    
     state.ui.viewingMicro = null;
     renderStatus(state);
     renderBoard(state);
@@ -342,11 +645,16 @@ async function handleMove(micro, row, col) {
         macroBoard: state.macroBoard,
         microBoards: state.microBoards,
         turn: state.turn,
-        nextForcedCell: state.nextForcedCell
+        nextForcedCell: state.nextForcedCell,
+        timerX: state.timerX,
+        timerO: state.timerO,
+        timedMode: state.timedMode
       });
     }
 
     if (result.gameEnd) {
+      stopTimer(state);
+      
       if (state.gameMode === "online") {
         await finishGame(state.onlineGameId, result.gameEnd.winner);
         
@@ -362,7 +670,8 @@ async function handleMove(micro, row, col) {
             eloResult = "loss";
           }
           
-          await updateUserStats(state.user.id, eloResult, 1000);
+          const opponentElo = 1000; // ELO base per il calcolo
+          await updateUserStats(state.user.id, eloResult, opponentElo);
         }
       }
       
@@ -455,13 +764,16 @@ function getAllValidMoves(state) {
 // ONLINE
 // ==========================================
 
-async function waitForOpponent(gameId) {
+async function waitForOpponent(gameId, timed) {
   const checkInterval = setInterval(async () => {
     const status = await checkGameStatus(gameId);
     if (status && status.status === "playing") {
       clearInterval(checkInterval);
-      resetGame(state, "online");
+      resetGame(state, "online", null, timed);
       state.onlineWaiting = false;
+      if (timed) {
+        startTimer(state);
+      }
       renderStatus(state);
       renderBoard(state);
       
@@ -490,11 +802,20 @@ function startOnlineSubscription(gameId) {
       state.turn = newState.turn;
       state.nextForcedCell = newState.nextForcedCell;
       
+      if (newState.timerX !== undefined) state.timerX = newState.timerX;
+      if (newState.timerO !== undefined) state.timerO = newState.timerO;
+      if (newState.timedMode !== undefined) state.timedMode = newState.timedMode;
+      
+      if (state.timedMode) {
+        switchTimer(state);
+      }
+      
       renderStatus(state);
       renderBoard(state);
     }
     
     if (update.status === "finished") {
+      stopTimer(state);
       setTimeout(() => {
         showGameEndDialog(update.winner);
       }, 500);
@@ -516,14 +837,14 @@ function showGameEndDialog(winner) {
     if (winner === "X") {
       message = "🎉 HAI VINTO! 🎉";
     } else {
-      message = "😔 L'AI HA VINTO";
+      message = "😢 L'AI HA VINTO";
     }
   } else if (state.gameMode === "online") {
     const mySymbol = state.onlinePlayerId === state.onlinePlayer1Id ? "X" : "O";
     if (winner === mySymbol) {
       message = "🎉 HAI VINTO! 🎉";
     } else {
-      message = "😔 HAI PERSO";
+      message = "😢 HAI PERSO";
     }
   } else {
     message = `🎉 VITTORIA ${winner}! 🎉`;
@@ -534,6 +855,8 @@ function showGameEndDialog(winner) {
   if (state.onlineChannel) {
     unsubscribe(state.onlineChannel);
   }
+  
+  stopTimer(state);
   
   state.ui.screen = "menu";
   renderStatus(state);
@@ -551,6 +874,12 @@ if ("serviceWorker" in navigator) {
 /* ===== ANIMAZIONI ===== */
 
 function animateMicroZoomIn(macroCellEl, microIndex) {
+  // Pulisci completamente eventuali animazioni in corso
+  const existingClones = document.querySelectorAll('.micro-zoom-clone');
+  const existingFades = document.querySelectorAll('.fade-overlay');
+  existingClones.forEach(el => el.remove());
+  existingFades.forEach(el => el.remove());
+
   const fade = document.createElement("div");
   fade.className = "fade-overlay";
   document.body.appendChild(fade);
@@ -576,39 +905,50 @@ function animateMicroZoomIn(macroCellEl, microIndex) {
 
   const rect = macroCellEl.getBoundingClientRect();
   
+  // Posiziona il clone esattamente sulla macro-cell con transform esplicito
   clone.style.left = rect.left + "px";
   clone.style.top = rect.top + "px";
   clone.style.width = rect.width + "px";
   clone.style.height = rect.height + "px";
+  clone.style.transition = "none";
+  clone.style.transform = "translate(0px, 0px) scale(1)";
 
+  // Forza un reflow completo
+  void clone.offsetHeight;
+
+  // Aspetta il prossimo frame prima di applicare la transizione
   requestAnimationFrame(() => {
-    const targetSize = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.85);
+    clone.style.transition = "transform 0.3s ease-out";
     
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    
-    const finalLeft = centerX - targetSize / 2;
-    const finalTop = centerY - targetSize / 2;
-    
-    const rectCenterX = rect.left + rect.width / 2;
-    const rectCenterY = rect.top + rect.height / 2;
-    
-    const scale = targetSize / rect.width;
-    const translateX = (finalLeft + targetSize / 2) - rectCenterX;
-    const translateY = (finalTop + targetSize / 2) - rectCenterY;
+    requestAnimationFrame(() => {
+      // Calcola le dimensioni finali
+      const maxWidth = window.innerWidth * 0.9;
+      const maxHeight = window.innerHeight * 0.85;
+      const targetSize = Math.min(maxWidth, maxHeight);
+      
+      // Calcola i centri
+      const screenCenterX = window.innerWidth / 2;
+      const screenCenterY = window.innerHeight / 2;
+      const currentCenterX = rect.left + rect.width / 2;
+      const currentCenterY = rect.top + rect.height / 2;
+      
+      // Calcola trasformazione
+      const scale = targetSize / rect.width;
+      const translateX = screenCenterX - currentCenterX;
+      const translateY = screenCenterY - currentCenterY;
 
-    clone.style.transformOrigin = "center center";
-    
-    fade.classList.add("active");
-    clone.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      // Applica trasformazione
+      fade.classList.add("active");
+      clone.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
 
-    setTimeout(() => {
-      state.ui.viewingMicro = microIndex;
-      renderStatus(state);
-      renderBoard(state);
-      clone.remove();
-      fade.remove();
-    }, 500);
+      setTimeout(() => {
+        state.ui.viewingMicro = microIndex;
+        renderStatus(state);
+        renderBoard(state);
+        clone.remove();
+        fade.remove();
+      }, 300);
+    });
   });
 }
 
@@ -618,6 +958,12 @@ function animateMicroZoomOut(targetMicroIndex, onComplete) {
     onComplete();
     return;
   }
+
+  // Pulisci eventuali animazioni residue
+  const existingClones = document.querySelectorAll('.micro-zoom-clone');
+  const existingFades = document.querySelectorAll('.fade-overlay');
+  existingClones.forEach(el => el.remove());
+  existingFades.forEach(el => el.remove());
 
   const rectStart = fullscreen.getBoundingClientRect();
   
@@ -640,33 +986,43 @@ function animateMicroZoomOut(targetMicroIndex, onComplete) {
 
     const clone = fullscreen.cloneNode(true);
     clone.className = "micro-zoom-clone";
-    clone.style.transformOrigin = "center center";
+    
+    // Posiziona al centro con transform esplicito
     clone.style.left = rectStart.left + "px";
     clone.style.top = rectStart.top + "px";
     clone.style.width = rectStart.width + "px";
     clone.style.height = rectStart.height + "px";
+    clone.style.transition = "none";
+    clone.style.transform = "translate(0px, 0px) scale(1)";
     
     document.body.appendChild(clone);
 
+    // Forza reflow
+    void clone.offsetHeight;
+
     requestAnimationFrame(() => {
-      const rectStartCenterX = rectStart.left + rectStart.width / 2;
-      const rectStartCenterY = rectStart.top + rectStart.height / 2;
+      clone.style.transition = "transform 0.3s ease-out";
       
-      const rectEndCenterX = rectEnd.left + rectEnd.width / 2;
-      const rectEndCenterY = rectEnd.top + rectEnd.height / 2;
-      
-      const scale = rectEnd.width / rectStart.width;
-      const translateX = rectEndCenterX - rectStartCenterX;
-      const translateY = rectEndCenterY - rectStartCenterY;
+      requestAnimationFrame(() => {
+        // Calcola trasformazione
+        const currentCenterX = rectStart.left + rectStart.width / 2;
+        const currentCenterY = rectStart.top + rectStart.height / 2;
+        const targetCenterX = rectEnd.left + rectEnd.width / 2;
+        const targetCenterY = rectEnd.top + rectEnd.height / 2;
+        
+        const scale = rectEnd.width / rectStart.width;
+        const translateX = targetCenterX - currentCenterX;
+        const translateY = targetCenterY - currentCenterY;
 
-      clone.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-      fade.classList.remove("active");
+        clone.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        fade.classList.remove("active");
 
-      setTimeout(() => {
-        clone.remove();
-        fade.remove();
-        onComplete();
-      }, 500);
+        setTimeout(() => {
+          clone.remove();
+          fade.remove();
+          onComplete();
+        }, 300);
+      });
     });
   }, 50);
 }

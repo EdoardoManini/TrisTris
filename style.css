@@ -82,8 +82,9 @@ body{
   touch-action:manipulation;
   box-shadow:0 4px 12px rgba(6,182,212,0.3);
   transition:all 0.2s;
-  margin-bottom: 1rem;
-  align-self: flex-start;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .back-menu-btn:active {
@@ -395,6 +396,114 @@ body{
 }
 
 /* ---------------------------------- */
+/*       TIMERS                       */
+/* ---------------------------------- */
+.timer-top {
+  width: auto;
+  max-width: 140px;
+  background: rgba(255,255,255,0.95);
+  border: 3px solid rgba(6,182,212,0.4);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  position: absolute;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.timer-bottom {
+  width: auto;
+  max-width: 140px;
+  background: rgba(255,255,255,0.95);
+  border: 3px solid rgba(6,182,212,0.4);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.timer-top.active,
+.timer-bottom.active {
+  border-color: #06b6d4;
+  box-shadow: 0 4px 20px rgba(6,182,212,0.4);
+}
+
+.timer-top.warning,
+.timer-bottom.warning {
+  border-color: #f59e0b;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.5);
+}
+
+.timer-top.danger,
+.timer-bottom.danger {
+  border-color: #ef4444;
+  box-shadow: 0 4px 20px rgba(239,68,68,0.6);
+}
+
+.timer-symbol {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.timer-symbol img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.timer-time {
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #0c4a6e;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+.timer-top.warning .timer-time,
+.timer-bottom.warning .timer-time {
+  color: #f59e0b;
+}
+
+.timer-top.danger .timer-time,
+.timer-bottom.danger .timer-time {
+  color: #ef4444;
+}
+
+/* Mobile adjustments for timers */
+@media (max-width: 768px) {
+  .timer-top,
+  .timer-bottom {
+    max-width: 120px;
+    padding: 0.4rem 0.6rem;
+  }
+  
+  .timer-symbol {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .timer-time {
+    font-size: 1rem;
+  }
+}
+
+/* ---------------------------------- */
 /*       BOARD LAYOUT                 */
 /* ---------------------------------- */
 
@@ -410,6 +519,8 @@ body{
   align-items:center;
   gap:1rem;
   width:100%;
+  position: relative;
+  padding: 3.5rem 0;
 }
 
 .macro-grid {
@@ -417,6 +528,7 @@ body{
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   width: min(700px, 92vw);
+  max-width: 700px;
   aspect-ratio: 1;
   margin: 0 auto;
   position: relative;
@@ -527,6 +639,28 @@ body{
 
 .install-btn:active {
   transform: scale(0.98);
+}
+
+.surrender-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 3px 10px rgba(239,68,68,0.3);
+  transition: all 0.2s;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
+
+.surrender-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(239,68,68,0.2);
 }
 
 .app-footer{
@@ -660,7 +794,7 @@ body{
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0);
-  transition: background 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition: background 0.3s ease-out;
   z-index: 9997;
   pointer-events: none;
 }
@@ -673,14 +807,15 @@ body{
   position: fixed;
   z-index: 9998;
   pointer-events: none;
-  transition: all 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
-  will-change: transform, opacity;
+  will-change: transform;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
   background: var(--line);
   padding: 2px;
   border-radius: 4px;
+  transform-origin: center center;
+  transition: transform 0.3s ease-out;
 }
 
 .micro-zoom-clone .micro-cell {

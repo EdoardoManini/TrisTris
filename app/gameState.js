@@ -10,12 +10,6 @@ export function initGameState() {
     nextForcedCell: null,
     gameMode: null, // "pvp" | "ai" | "online"
     aiDifficulty: null, // "easy" | "medium" | "hard"
-    // Timer properties
-    timedMode: false, // true se modalità con tempo, false se classic
-    timerX: 300, // 5 minuti in secondi
-    timerO: 300,
-    timerInterval: null,
-    lastMoveTime: null,
     // Online properties (Supabase)
     onlineGameId: null,
     onlineGameCode: null,
