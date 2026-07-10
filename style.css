@@ -778,7 +778,7 @@ body{
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
-  width: min(90vw, 90vh);
+  width: min(90vw, calc(100dvh - 140px));
   aspect-ratio: 1;
   background: var(--line);
   padding: 3px;
