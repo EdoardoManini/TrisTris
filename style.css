@@ -17,14 +17,19 @@
   user-select: none;
 }
 
-html, body { 
-  height: 100%;
+html, body {
+  min-height: 100%;
   width: 100%;
-  position: fixed;
-  overflow-y: auto; 
   overflow-x: hidden;
   overscroll-behavior: none;
-  touch-action: none;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100dvh;
 }
 
 body{
@@ -42,9 +47,11 @@ body{
   flex-direction:column;
   gap:1rem;
   align-items:center;
+  /* "safe center": centra quando c'è spazio, ma non taglia mai la parte alta
+     quando il contenuto è più alto del viewport */
   justify-content:center;
+  justify-content:safe center;
   padding:1rem;
-  overflow:hidden;
   position:relative;
 }
 
@@ -528,7 +535,12 @@ body{
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  width: min(700px, 92vw, 62dvh);
+  /* La board è quadrata: la sua altezza = larghezza. Il terzo termine sottrae
+     lo spazio verticale fisso attorno alla board (status bar ~55px, padding
+     game-container 2x3.5rem, padding board-placeholder 2x1.5rem, gap,
+     padding app-shell, footer ~40px ≈ 320px) così sta sempre nel viewport. */
+  width: min(700px, 92vw, calc(100dvh - 320px));
+  min-width: 280px;
   max-width: 700px;
   aspect-ratio: 1;
   margin: 0 auto;
