@@ -21,7 +21,8 @@ html, body {
   height: 100%;
   width: 100%;
   position: fixed;
-  overflow: hidden;
+  overflow-y: auto; 
+  overflow-x: hidden;
   overscroll-behavior: none;
   touch-action: none;
 }
@@ -527,7 +528,7 @@ body{
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  width: min(700px, 92vw);
+  width: min(700px, 92vw, 62dvh);
   max-width: 700px;
   aspect-ratio: 1;
   margin: 0 auto;
